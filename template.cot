@@ -1,0 +1,187 @@
+<@SCRIPT
+
+
+function BackboneClassDefinition(pUMLClass) {
+
+	var oUMLClass = pUMLClass;
+	var oParentUMLClass = null;
+	var vImplInterfacesArr = new Array();
+	
+	var vHasAbstractOperations = false;
+	var vParentHasValidation = false;
+
+	var vAtrArr = __getAtributesArr();
+	var vAtrValidationArr = __getAtributesValidationArr();
+	
+	// Returns the string representation for the Backbone.js Model Class
+	this.getModelDefinition = function() {
+	
+		var vDefStr = "";
+
+		vDefStr += "var " + oUMLClass.Name + " = ";
+		
+		if (oParentUMLClass != null) vDefStr += oParentUMLClass.Name;
+		else vDefStr += "Backbone.Model";
+		
+		vDefStr += ".extend({\n";
+		if (vAtrArr.length > 0 ) {
+			vDefStr += "\tdefaults: ";
+			if (oParentUMLClass != null) {
+				vDefStr += "_.defaults(";
+			}
+			vDefStr += "{";
+				for(var j=0 ; j<vAtrArr.length ; j++) {
+					vDefStr += "\n\t\t"+vAtrArr[j];
+					if (j != vAtrArr.length-1) vDefStr += ",";
+				}
+			vDefStr += "\n\t}";
+			if (oParentUMLClass != null) {
+				vDefStr += ", " + oParentUMLClass.Name + ".prototype.defaults)";
+			}
+
+			if (vAtrValidationArr.length > 0 || vParentHasValidation) {
+				vDefStr += ",\n\n\tvalidate: function(attrs, options) {";
+				for(var j=0 ; j<vAtrValidationArr.length ; j++) {
+					vDefStr += "\n"+vAtrValidationArr[j];
+				}
+				if (vParentHasValidation) {
+					vDefStr += "\n\t\treturn " + oParentUMLClass.Name + ".prototype.validate(attrs, options);";
+				}
+				vDefStr += "\n\t}";
+			}
+		}
+		vDefStr += "\n});\n";
+	
+		return(vDefStr);		
+	};	
+
+	// Returns the string representation for the Backbone.js Model Collection Class	
+	this.getCollectionDefinition = function() {
+	
+		var vDefStr = "";
+
+		vDefStr += "var " + oUMLClass.Name + "Collection = ";
+		
+		if (oParentUMLClass != null) vDefStr += oParentUMLClass.Name;
+		else vDefStr += "Backbone.";
+		
+		vDefStr += "Collection.extend({\n";	
+		vDefStr += "\tmodel: " + oUMLClass.Name;
+		vDefStr += "\n});\n";
+
+		return(vDefStr);		
+	};		
+	
+	// Sets the parent class
+	this.setParentClass = function(pUMLClass) {
+		oParentUMLClass=pUMLClass;
+		return;
+	}
+
+	// Get all attributes of the Class for 'defaults'
+	function __getAtributesArr() {
+		var vItemArr = new Array();
+		var vItemCount = oUMLClass.MOF_GetCollectionCount("Attributes");
+		for(var j=0 ; j<vItemCount ; j++) 
+			vItemArr.push(__getAtributeDefStr(oUMLClass.MOF_GetCollectionItem("Attributes",j)));
+		return(vItemArr);
+	}
+
+	// Get all attributes of the Class for 'validation'
+	function __getAtributesValidationArr() {
+		var vItemArr = new Array();	
+		var vItemCount = oUMLClass.MOF_GetCollectionCount("Attributes");
+		for(var j=0;j<vItemCount;j++) {
+			attrValidation = __getAtributeValidationDefStr(oUMLClass.MOF_GetCollectionItem("Attributes",j));
+			if (attrValidation !== "") {
+				vItemArr.push(attrValidation);
+			}
+		}
+		return(vItemArr);
+	}
+
+	// Returns the attribute definition for 'defaults'
+	function __getAtributeDefStr(oAtribute)
+	{
+		vStrName = oAtribute.MOF_GetAttribute("Name")
+		vStrInitialValue = oAtribute.MOF_GetAttribute("InitialValue")
+		
+		return("\"" + vStrName + "\" : " + vStrInitialValue);
+	}
+	
+	// Returns the attribute definition for 'validation'
+	function __getAtributeValidationDefStr(oAtribute)
+	{
+		vStrName = oAtribute.MOF_GetAttribute("Name");
+		var vValidationStr = "";
+		if (oAtribute.Multiplicity.indexOf('1',0) == 0) {
+			var vValidationStr = "\t\tif (! attrs." + vStrName + ") {\n"
+			vValidationStr += "\t\t\treturn \"Attribute " + vStrName + " cannot be null or empty\";";
+			vValidationStr += "\n\t\t}"
+		}
+		return(vValidationStr);
+	}	
+}
+
+@>
+
+<@SCRIPT
+	var lib = "lib";
+	var assetsJS = "assets/js";
+@>
+
+<@REPEAT {R};UMLClass;;@>
+<@SCRIPT
+	////////////////////////////////////////
+	// Backbone Model Class
+	////////////////////////////////////////
+	fileBegin(getTarget()+"\\"+lib+"\\"+current().Name+"Model.js");
+	var vClassName=current().Name;
+	var backboneClass= new BackboneClassDefinition(current());
+@>
+<@REPEAT {R}::;UMLGeneralization;;@>	
+<@SCRIPT
+	// Assign the parent class for each Generalization (Inheritance)
+	if(vClassName==current().Child.Name) backboneClass.setParentClass(current().Parent);
+@>
+<@ENDREPEAT@>
+<@="// ******* Generated " + vClassName + "Model and " + vClassName + "Collection **********" @>
+<@=backboneClass.getModelDefinition()@>
+<@=backboneClass.getCollectionDefinition()@>
+<@SCRIPT
+    fileEnd();
+@>
+
+<@SCRIPT
+	////////////////////////////////////////
+	// Backbone View and CollectionView Class
+	////////////////////////////////////////
+    fileBegin(getTarget()+"\\"+lib+"\\"+current().Name+"View.js");
+    var vClassName=current().Name;
+	var vClassNameLower=vClassName.toLowerCase();
+    var backboneClass= new BackboneClassDefinition(current());
+@>
+<@="// ******* Generated " + vClassName + "View and " + vClassName + "CollectionView **********" @>
+<@="var "+vClassName+"View = Backbone.View.extend({" @>
+<@="\ttagName: 'li'," @>
+<@="\n\ttemplate: _.template( $('#"+vClassNameLower+"Template').html() )," @>
+<@="\n\trender: function() {" @>
+<@="\t\tthis.$el.html( this.template(this.model.toJSON()) );" @>
+<@="\t\treturn this;" @>
+<@="\t}" @>
+<@="});" @>
+
+<@="var "+vClassName+"CollectionView = Backbone.View.extend({" @>
+<@="\ttagName: 'ul'," @>
+<@="\n\trender: function() {" @>
+<@="\t\tthis.collection.each(function("+vClassNameLower+") {" @>
+<@="\t\t\tvar "+vClassNameLower+"View = new "+vClassName+"View({ model: "+vClassNameLower+" });" @>
+<@="\t\t\tthis.$el.append("+vClassNameLower+"View.render().el);" @>
+<@="\t\t}, this);" @>
+<@="\t\treturn this;" @>
+<@="\t}" @>
+<@="});" @>
+<@SCRIPT
+    fileEnd();
+@>
+<@ENDREPEAT@>
