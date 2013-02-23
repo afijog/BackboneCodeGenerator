@@ -1,5 +1,61 @@
 <@SCRIPT
 
+// A class to get information about the Design Model
+function DesignModelDefinition(pModel) {
+	var oModel = pModel;
+	var vClasses = getUMLClasses();
+	
+	// Returns the string representation for the index.html file
+	this.getIndexContents = function() {
+		var nClasses = vClasses.length;
+		
+		var vDefStr = "<!DOCTYPE HTML>";
+		vDefStr += "\n<html>";
+		vDefStr += "\n<head>\n";
+		
+		var className = "";
+		
+		for(var j=nClasses-1 ; j>=0 ; j--) {
+			name = vClasses[j].MOF_GetAttribute("Name");
+			vDefStr += "\n<script id=\""+name.toLowerCase()+"Template\" type=\"text/template\">";
+			vDefStr += "\n\t<strong><%= name %></strong>";
+			vDefStr += "\n</script>";
+		}
+
+		vDefStr += "\n\n<script type=\"text/javascript\" src=\""+assetsJS+"/underscore-min.js\"></script>";
+		vDefStr += "\n<script type=\"text/javascript\" src=\""+assetsJS+"/jquery.min.js\"></script>";
+		vDefStr += "\n<script type=\"text/javascript\" src=\""+assetsJS+"/backbone-min.js\"></script>";
+
+		for(var j=nClasses-1 ; j>=0 ; j--) {
+			className = vClasses[j].MOF_GetAttribute("Name");
+			vDefStr += "\n\n<script type=\"text/javascript\" src=\""+lib+"/" + className + "Model.js\"></script>";
+			vDefStr += "\n<script type=\"text/javascript\" src=\""+lib+"/" + className + "View.js\"></script>";
+		}
+
+		vDefStr += "\n\n<script type=\"text/javascript\" src=\""+lib+"/application.js\"></script>";
+		vDefStr += "\n</head>";
+		vDefStr += "\n<body><div id=\"contents\"></div></body>";
+		vDefStr += "\n</html>";		
+		
+		return (vDefStr);
+	}
+	
+	
+	// Returns an array with all the UML Classes in the Design Model
+	function getUMLClasses() {
+		var classes = new Array();
+		var count = oModel.MOF_GetCollectionCount("OwnedElements");
+		var element = null
+		
+		for(var j=0;j<count;j++) {
+			element = oModel.MOF_GetCollectionItem("OwnedElements",j);
+			if (element.isKindOf("UMLClass")) {
+				classes.push(element);
+			}
+		}
+		return(classes);
+	}
+}
 
 function BackboneClassDefinition(pUMLClass) {
 
@@ -125,9 +181,36 @@ function BackboneClassDefinition(pUMLClass) {
 
 @>
 
+
+<@REPEAT {R}::;UMLModel;;@>	
+<@SCRIPT
+var vCurrentModelName=current().Name;
+var designModel;
+if (vCurrentModelName=="Design Model") { 
+designModel = new DesignModelDefinition(current());
+}
+@>
+<@ENDREPEAT@>	
+
 <@SCRIPT
 	var lib = "lib";
 	var assetsJS = "assets/js";
+	fileBegin(getTarget()+"\\index.html");
+@>	
+<@= designModel.getIndexContents() @>
+<@SCRIPT
+	fileEnd();
+@>
+
+<@SCRIPT
+////////////////////////////////////////
+// Backbone Application.js 
+////////////////////////////////////////
+    fileBegin(getTarget()+"\\"+lib+"\\application.js");
+@>
+<@= "//******* Generated application.js **********" @>
+<@SCRIPT
+    fileEnd();
 @>
 
 <@REPEAT {R};UMLClass;;@>
