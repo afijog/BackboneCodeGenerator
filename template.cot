@@ -67,6 +67,7 @@ function BackboneClassDefinition(pUMLClass) {
 	var vParentHasValidation = false;
 
 	var vAtrArr = __getAtributesArr();
+	var vOprArr = __getMethodsArr(oUMLClass);
 	var vAtrValidationArr = __getAtributesValidationArr();
 	
 	// Returns the string representation for the Backbone.js Model Class
@@ -106,8 +107,18 @@ function BackboneClassDefinition(pUMLClass) {
 				vDefStr += "\n\t}";
 			}
 		}
+				
 		vDefStr += "\n});\n";
-	
+		
+		// Add definition of methods in prototype 
+		if (vOprArr.length > 0 ) {
+			for(var j=0 ; j<vOprArr.length ; j++) {
+				vDefStr += "\n"+ oUMLClass.Name + '.prototype.'+ vOprArr[j];
+			}
+		}
+		
+		vDefStr += "\n";
+		
 		return(vDefStr);		
 	};	
 
@@ -155,12 +166,92 @@ function BackboneClassDefinition(pUMLClass) {
 		}
 		return(vItemArr);
 	}
+	
+	// Get all the methods (operations) for the UMLClass
+	function __getMethodsArr(oMethodContainer) {
+		var vItemArr = new Array();
+		var vItemCount = oMethodContainer.MOF_GetCollectionCount("Operations");
+		for(var j=0;j<vItemCount;j++) {
+			vItemArr.push(__getMethodDefStr(oMethodContainer.MOF_GetCollectionItem("Operations",j)));	
+		}
+		return(vItemArr);
+	}
 
+	// Get the string representation of the method
+	function __getMethodDefStr(oMethod)
+	{
+		var vStrName,vInParamStr,vBodyStr,vParamArr;
+		
+		vStrName=oMethod.MOF_GetAttribute("Name");
+		
+		vParamArr=__getMethodParamArr(oMethod);
+		// Get the parameters of the method
+		vInParamStr=vParamArr['in'].join(', ');
+		
+		vBodyStr=" {\n\t";
+		
+		var existsDefaultInValues = false;
+		
+		for(var j=0;j<vParamArr['inDefaultValues'].length;j++) {
+			var paramDefaultValue = vParamArr['inDefaultValues'][j];
+			if (paramDefaultValue != "") {
+				var paramName = vParamArr['in'][j];
+				vBodyStr += "\n\tif(typeof(" + paramName + ")==='undefined') " + paramName + " = " + paramDefaultValue+";";
+				existsDefaultInValues = true;
+			}
+		}
+
+		if (existsDefaultInValues) {
+			vBodyStr += "\n\n\t";
+		}
+		
+		if(vParamArr['return'].length>0) {
+			var returnParamName = vParamArr['return'][0];
+			vBodyStr+= "var " + returnParamName;
+			
+			if (vParamArr['returnDefaultValues'][0] != "") {
+				vBodyStr+= " = " + vParamArr['returnDefaultValues'][0];
+			}
+			vBodyStr+=";\n";
+			vBodyStr+= "\treturn " + returnParamName + ";";
+		}
+		else vBodyStr+="return;";
+		vBodyStr+="\n};";
+		
+		return(vStrName + ' = function ('+vInParamStr+')'+vBodyStr);
+	}
+
+	function __getMethodParamArr(oMethod) {
+		var vItemArr = {'in' : null, 'inDefaultValues' : null, 'return' : null, 'returnDefaultValues' : null};
+		vItemArr['in'] = new Array();
+		vItemArr['inDefaultValues'] = new Array();
+		vItemArr['return'] = new Array();
+		vItemArr['returnDefaultValues'] = new Array();
+		var vItemCount = oMethod.MOF_GetCollectionCount("Parameters");
+		var oItem=null;
+		var vDirection=null;
+		for(var j=0;j<vItemCount;j++) {
+			oItem=oMethod.MOF_GetCollectionItem("Parameters",j);
+			vDirection=oItem.MOF_GetAttribute("DirectionKind");
+			if(vDirection!='pdkReturn') {
+				vItemArr['in'].push(oItem.MOF_GetAttribute("Name"));
+				vItemArr['inDefaultValues'].push(oItem.MOF_GetAttribute("DefaultValue"));
+			}
+			else { 
+				vItemArr['return'].push(oItem.MOF_GetAttribute("Name"));
+				vItemArr['returnDefaultValues'].push(oItem.MOF_GetAttribute("DefaultValue"));
+			}
+			oItem=null;
+			vDirection=null;
+		}				
+		return(vItemArr);
+	}
+	
 	// Returns the attribute definition for 'defaults'
 	function __getAtributeDefStr(oAtribute)
 	{
-		vStrName = oAtribute.MOF_GetAttribute("Name")
-		vStrInitialValue = oAtribute.MOF_GetAttribute("InitialValue")
+		vStrName = oAtribute.MOF_GetAttribute("Name");
+		vStrInitialValue = oAtribute.MOF_GetAttribute("InitialValue");
 		
 		return("\"" + vStrName + "\" : " + vStrInitialValue);
 	}
